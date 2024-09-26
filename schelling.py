@@ -2,7 +2,6 @@ import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-import random
 
 class Schelling:
     def __init__(self, n_agent_classes, tolerance_treshold, lattice_m, lattice_n, empty_ratio, seed=0):
@@ -21,6 +20,7 @@ class Schelling:
 
         self.random_seeded = np.random.default_rng(seed)
         self.assign_agents()
+        self.node_count_per_class = self.count_nodes_per_class()
 
     def assign_agents(self):
         """Assigns agents to the graph according to empty ratio and number of agent classes"""
@@ -75,7 +75,10 @@ class Schelling:
     
     def move_agent(self, node):
         """Move agent to a free position/node in graph"""
-        available_positions = [n for n in self.graph.nodes if self.graph.nodes[n]['id'] is None]
+        neighbor_positions = self.get_neighbors(node)
+
+        # Filter neighbors to find those that are empty (id is None)
+        available_positions = [n for n in neighbor_positions if self.graph.nodes[n]['id'] is None]
 
         if not available_positions:
             return
@@ -121,13 +124,37 @@ class Schelling:
             edge_color='gray',
             ax=ax
         )
+    
+    def print_node_counts(self):
+        """Print the total number of nodes for each class."""
+        print("Total nodes per class:")
+        for agent_class, count in self.node_count_per_class.items():
+            if agent_class is None:
+                print(f"Empty Nodes: {count}")
+            else:
+                print(f"Class {agent_class}: {count}")
 
-schelling = Schelling(n_agent_classes=6, tolerance_treshold=0.5, lattice_m=20, lattice_n=20, empty_ratio=0.32)
+    def count_nodes_per_class(self):
+        """Count total number of nodes for each class."""
+        count = {i: 0 for i in range(1, self.n_agent_classes + 1)}
+        count[None] = 0  # Count for empty spaces
+
+        for node in self.graph.nodes:
+            agent_id = self.graph.nodes[node]['id']
+            if agent_id is not None:
+                count[agent_id] += 1
+            else:
+                count[None] += 1
+
+        return count
+
+schelling = Schelling(n_agent_classes=2, tolerance_treshold=0.5, lattice_m=20, lattice_n=20, empty_ratio=0.32)
 
 fig, ax = plt.subplots(figsize=(8, 8))
 
 def update(frame):
     """Update function for each animation frame. Simulation ends when all nodes are satisfied"""
+    schelling.print_node_counts()
     if not schelling.is_balanced():
         schelling.simulate()
         schelling.draw_graph(ax)
