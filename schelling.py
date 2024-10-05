@@ -28,6 +28,7 @@ class Schelling:
         self.random_seeded = np.random.default_rng(seed)
         self.assign_agents()
         self.node_count_per_class = self.count_nodes_per_class()
+        self.assign_weights()
 	
     def add_diagonal_edges(self, graph):
         """Add diagonal edges to existing grid graph"""
@@ -61,6 +62,13 @@ class Schelling:
             self.graph.nodes[pos]['class'] = None if agent_id == 0 else agent_id
             self.graph.nodes[pos]['threshold'] = self.tolerance_treshold
 
+    def assign_weights(self):
+        """Assigns random weights to the graph's edges between 1 and 5."""
+        
+        for edge in self.graph.edges:
+            weight = self.random_seeded.integers(1, 5) 
+            self.graph.edges[edge]['weight'] = weight
+
     def get_neighbors(self, node):
         """Returns a list of all neighbors of node, ie all nodes that have an edge connected to it"""
         return list(self.graph.neighbors(node))
@@ -89,15 +97,14 @@ class Schelling:
     
     def move_agent(self, node):
         """Move agent to any free position/node in neighborhood"""
-
-        available_positions = [n for n in self.graph.nodes if self.graph.nodes[n]['class'] is None]
+        available_positions = [n for n in self.get_neighbors(node) if self.graph.nodes[n]['class'] is None]
 
         if not available_positions:
             return
 
-        new_position = tuple(self.random_seeded.choice(available_positions))
+        cheapest_position = min(available_positions, key=lambda pos: self.graph.edges[(node, pos)]['weight'])
 
-        self.graph.nodes[new_position]['class'] = self.graph.nodes[tuple(node)]['class']
+        self.graph.nodes[cheapest_position]['class'] = self.graph.nodes[node]['class']
         self.graph.nodes[tuple(node)]['class'] = None
 
     def simulate(self):
@@ -125,23 +132,21 @@ class Schelling:
 
         ax.clear()
 
-        no_edges = nx.subgraph_view(self.graph, filter_edge=nx.classes.filters.hide_edges(self.graph.edges))
-
         total_nodes = self.graph.number_of_nodes()
         base_node_size = 100  
         scaling_factor = 1000 / total_nodes  # Scale down the node size based on total nodes
         adjusted_node_size = base_node_size * scaling_factor
 
-        nx.draw(
-            no_edges,
-            pos,
-            node_color=node_color,
-            with_labels=False,
-            node_size=adjusted_node_size,
-            edge_color=None,
-            ax=ax
-        )
-    
+        no_edges = nx.subgraph_view(self.graph, filter_edge=nx.classes.filters.hide_edges(self.graph.edges))
+
+        # Drawing edges is too expensive
+        nx.draw(#self.graph
+        no_edges
+        , pos, node_color=node_color, with_labels=False, node_size=adjusted_node_size, edge_color=None, ax=ax)
+        #edge_labels = nx.get_edge_attributes(self.graph, 'weight')
+        #nx.draw_networkx_edges(self.graph, pos, ax=ax, width=1,alpha=0.5)
+        #nx.draw_networkx_edge_labels(self.graph,pos, edge_labels=edge_labels, font_color='black', font_size=8, ax=ax)
+        
     def print_node_counts(self):
         """Print the total number of nodes for each class."""
 
@@ -166,7 +171,7 @@ class Schelling:
                 count[None] += 1
         return count
 
-schelling = Schelling(n_agent_classes=5, tolerance_treshold=0.5, lattice_m=50, lattice_n=50, empty_ratio=0.65, seed=0)
+schelling = Schelling(n_agent_classes=2, tolerance_treshold=0.45, lattice_m=100, lattice_n=100, empty_ratio=0.65, seed=0)
 fig, ax = plt.subplots(figsize=(8, 8))
 
 def update(frame):
@@ -179,5 +184,5 @@ def update(frame):
     plt.title(f"Generation {frame + 1}")
 
 schelling.print_node_counts()
-ani = animation.FuncAnimation(fig, update, frames=None, interval=1, repeat=False, save_count=0, cache_frame_data=False)
+ani = animation.FuncAnimation(fig, update, frames=None, interval=500, repeat=False, save_count=0, cache_frame_data=False)
 plt.show()
