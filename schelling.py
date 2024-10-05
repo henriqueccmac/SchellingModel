@@ -90,8 +90,7 @@ class Schelling:
     def move_agent(self, node):
         """Move agent to any free position/node in neighborhood"""
 
-        neighbor_positions = self.get_neighbors(node)
-        available_positions = [n for n in neighbor_positions if self.graph.nodes[n]['class'] is None]
+        available_positions = [n for n in self.graph.nodes if self.graph.nodes[n]['class'] is None]
 
         if not available_positions:
             return
@@ -167,7 +166,7 @@ class Schelling:
                 count[None] += 1
         return count
 
-schelling = Schelling(n_agent_classes=4, tolerance_treshold=0.7, lattice_m=50, lattice_n=50, empty_ratio=0.65, seed=0)
+schelling = Schelling(n_agent_classes=5, tolerance_treshold=0.5, lattice_m=50, lattice_n=50, empty_ratio=0.65, seed=0)
 fig, ax = plt.subplots(figsize=(8, 8))
 
 def update(frame):
