@@ -73,23 +73,14 @@ class Schelling:
             return False
 
         neighborhood = self.get_neighbors(node)
-        similar_count = 0
-        occupied_count = 0
-
-        for neighbor in neighborhood:
-            neighbor_agent_id = self.graph.nodes[neighbor]['class']
-
-            if neighbor_agent_id is not None: 
-                occupied_count += 1
-                if neighbor_agent_id == agent_id:  # Similar neighbor
-                    similar_count += 1
+        similar_count = sum(1 for neighbor in neighborhood if self.graph.nodes[neighbor]['class'] == agent_id)
+        occupied_count = sum(1 for neighbor in neighborhood if self.graph.nodes[neighbor]['class'] is not None)
 
         if occupied_count == 0:  # No neighbors
             return False
 
         satisfaction_ratio = similar_count / occupied_count
 
-        # Debug log
         if DEBUG:
             print(f"Node at {node} (Class: {agent_id}) - Satisfaction ratio: {satisfaction_ratio}, Threshold: {self.graph.nodes[node]['threshold']}")
 
@@ -100,7 +91,6 @@ class Schelling:
         """Move agent to any free position/node in neighborhood"""
 
         neighbor_positions = self.get_neighbors(node)
-
         available_positions = [n for n in neighbor_positions if self.graph.nodes[n]['class'] is None]
 
         if not available_positions:
@@ -177,7 +167,7 @@ class Schelling:
                 count[None] += 1
         return count
 
-schelling = Schelling(n_agent_classes=2, tolerance_treshold=0.7, lattice_m=100, lattice_n=100, empty_ratio=0.65, seed=0)
+schelling = Schelling(n_agent_classes=4, tolerance_treshold=0.7, lattice_m=50, lattice_n=50, empty_ratio=0.65, seed=0)
 fig, ax = plt.subplots(figsize=(8, 8))
 
 def update(frame):
@@ -191,6 +181,4 @@ def update(frame):
 
 schelling.print_node_counts()
 ani = animation.FuncAnimation(fig, update, frames=None, interval=1, repeat=False, save_count=0, cache_frame_data=False)
-
-
 plt.show()
