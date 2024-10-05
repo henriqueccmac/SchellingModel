@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
+DEBUG = False 
 # ideas:
 # change the probability distribution of the classes
 # increase neighborhood of nodes
@@ -30,6 +31,7 @@ class Schelling:
 	
     def add_diagonal_edges(self, graph):
         """Add diagonal edges to existing grid graph"""
+
         for x in range(self.lattice_m):
             for y in range(self.lattice_n):
                 node = (x,y)
@@ -41,6 +43,7 @@ class Schelling:
     
     def assign_agents(self):
         """Assigns agents to the graph according to empty ratio and number of agent classes"""
+
         total_nodes = self.graph.number_of_nodes()
         
         # Possible agents: [0 (empty), 1, 2, ..., n_agents]
@@ -57,7 +60,6 @@ class Schelling:
         for pos, agent_id in zip(positions, agent_id_list):
             self.graph.nodes[pos]['class'] = None if agent_id == 0 else agent_id
             self.graph.nodes[pos]['threshold'] = self.tolerance_treshold
-            self.graph.nodes[pos]['movable'] = True
 
     def get_neighbors(self, node):
         """Returns a list of all neighbors of node, ie all nodes that have an edge connected to it"""
@@ -65,9 +67,6 @@ class Schelling:
     
     def is_unsatisfied(self, node):
         """Checks if neighbors are at least node.treshold similar to node"""
-        if self.graph.nodes[node]['movable'] == False:
-            # Cant move, no point in trying to calculate satisfaction to see if will move
-            return False       
 
         agent_id = self.graph.nodes[node]['class']
         if agent_id is None:
@@ -91,22 +90,20 @@ class Schelling:
         satisfaction_ratio = similar_count / occupied_count
 
         # Debug log
-        print(f"Node at {node} (Class: {agent_id}) - Satisfaction ratio: {satisfaction_ratio}, Threshold: {self.graph.nodes[node]['threshold']}")
+        if DEBUG:
+            print(f"Node at {node} (Class: {agent_id}) - Satisfaction ratio: {satisfaction_ratio}, Threshold: {self.graph.nodes[node]['threshold']}")
 
         # The agent is unsatisfied if the similarity ratio is below its threshold
         return satisfaction_ratio < self.graph.nodes[node]['threshold']
     
     def move_agent(self, node):
         """Move agent to any free position/node in neighborhood"""
-        if self.graph.nodes[node]['movable'] == False:
-            return
-        
+
         neighbor_positions = self.get_neighbors(node)
 
         available_positions = [n for n in neighbor_positions if self.graph.nodes[n]['class'] is None]
 
         if not available_positions:
-            self.graph.nodes[node]['movable'] = False # surrounded by non similar class, cant move
             return
 
         new_position = tuple(self.random_seeded.choice(available_positions))
@@ -114,22 +111,21 @@ class Schelling:
         self.graph.nodes[new_position]['class'] = self.graph.nodes[tuple(node)]['class']
         self.graph.nodes[tuple(node)]['class'] = None
 
-    def is_balanced(self):
-        """Simulation ends when all nodes are satisfied"""
-        for node in list(self.graph.nodes):
-            if self.is_unsatisfied(node):
-                return False
-        return True
-
     def simulate(self):
-        """Move agents according to their satisfaction needs"""
-        for node in list(self.graph.nodes):
-            if self.graph.nodes[node]['class'] is not None:
-                if self.is_unsatisfied(node):
-                    self.move_agent(node)
+        """Move agents according to their satisfaction"""
+
+        unsatisfied_agents = [node for node in self.graph.nodes if self.is_unsatisfied(node)]
+
+        if not unsatisfied_agents:
+            return False # All satisfied, stop simulation
+        
+        for node in unsatisfied_agents:
+            self.move_agent(node)
+        return True
        
     def draw_graph(self, ax):
         """Assign a color to each node and draw the graph"""
+
         pos = {(x, y): (y, -x) for x, y in self.graph.nodes()}  
         colors = ['#FF5733', '#33FF57', '#3357FF', '#FF33A8', '#33FFF3'] 
 
@@ -140,18 +136,26 @@ class Schelling:
 
         ax.clear()
 
+        no_edges = nx.subgraph_view(self.graph, filter_edge=nx.classes.filters.hide_edges(self.graph.edges))
+
+        total_nodes = self.graph.number_of_nodes()
+        base_node_size = 100  
+        scaling_factor = 1000 / total_nodes  # Scale down the node size based on total nodes
+        adjusted_node_size = base_node_size * scaling_factor
+
         nx.draw(
-            self.graph,
+            no_edges,
             pos,
             node_color=node_color,
             with_labels=False,
-            node_size=300,
-            edge_color='gray',
+            node_size=adjusted_node_size,
+            edge_color=None,
             ax=ax
         )
     
     def print_node_counts(self):
         """Print the total number of nodes for each class."""
+
         print("Total nodes per class:")
         for agent_class, count in self.node_count_per_class.items():
             if agent_class is None:
@@ -161,6 +165,7 @@ class Schelling:
 
     def count_nodes_per_class(self):
         """Count total number of nodes for each class."""
+
         count = {i: 0 for i in range(1, self.n_agent_classes + 1)}
         count[None] = 0  # Count for empty spaces
 
@@ -172,18 +177,20 @@ class Schelling:
                 count[None] += 1
         return count
 
-schelling = Schelling(n_agent_classes=2, tolerance_treshold=0.5, lattice_m=20, lattice_n=30, empty_ratio=0.3, seed=0)
-
+schelling = Schelling(n_agent_classes=2, tolerance_treshold=0.7, lattice_m=100, lattice_n=100, empty_ratio=0.65, seed=0)
 fig, ax = plt.subplots(figsize=(8, 8))
 
 def update(frame):
-    """Update function for each animation frame. Simulation ends when all nodes are satisfied"""
-    if not schelling.is_balanced():
-        schelling.simulate()
-        schelling.draw_graph(ax)
-        plt.title(f"Generation {frame + 1}")
+    """Update function for each animation frame. Simulation ends when all nodes are satisfied."""
+
+    if not schelling.simulate(): # Simulate until all satisfied
+        ani.event_source.stop()  
+        print(f"Simulation ended at generation {frame + 1}.") 
+    schelling.draw_graph(ax)  
+    plt.title(f"Generation {frame + 1}")
 
 schelling.print_node_counts()
-ani = animation.FuncAnimation(fig, update, frames=500, interval=100, repeat=False)
+ani = animation.FuncAnimation(fig, update, frames=None, interval=1, repeat=False, save_count=0, cache_frame_data=False)
+
 
 plt.show()
