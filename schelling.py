@@ -104,7 +104,10 @@ class Schelling:
     def simulate(self):
         """Move agents according to their satisfaction"""
 
-        unsatisfied_agents = [node for node in self.graph.nodes if self.is_unsatisfied(node)]
+        all_nodes = list(self.graph.nodes)
+        self.random_seeded.shuffle(all_nodes) 
+        
+        unsatisfied_agents = [node for node in all_nodes if self.is_unsatisfied(node)]
 
         if not unsatisfied_agents:
             return False # All satisfied, stop simulation
@@ -167,7 +170,7 @@ class Schelling:
                 count[None] += 1
         return count
 
-schelling = Schelling(n_agent_classes=4, tolerance_treshold=0.7, lattice_m=50, lattice_n=50, empty_ratio=0.65, seed=0)
+schelling = Schelling(n_agent_classes=3, tolerance_treshold=0.5, lattice_m=50, lattice_n=50, empty_ratio=0.50, seed=0)
 fig, ax = plt.subplots(figsize=(8, 8))
 
 def update(frame):
