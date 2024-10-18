@@ -3,17 +3,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
-DEBUG = False 
-# ideas:
-# change the probability distribution of the classes
-# increase neighborhood of nodes
-# if at the end of simulation there unsatisfied nodes because they cant move, change their color
+DEBUG = True 
 
 class Schelling:
-    def __init__(self, n_agent_classes, tolerance_treshold, lattice_m, lattice_n, empty_ratio, seed=0):
+    def __init__(self, n_agent_classes, tolerance_threshold, lattice_m, lattice_n, empty_ratio, seed=0):
         self.seed = seed
         self.empty_ratio = empty_ratio
-        self.tolerance_treshold = tolerance_treshold
+        self.tolerance_threshold = tolerance_threshold
         self.n_agent_classes = n_agent_classes
         
         self.lattice_m = lattice_m
@@ -59,14 +55,15 @@ class Schelling:
 
         for pos, agent_id in zip(positions, agent_id_list):
             self.graph.nodes[pos]['class'] = None if agent_id == 0 else agent_id
-            self.graph.nodes[pos]['threshold'] = self.tolerance_treshold
+            self.graph.nodes[pos]['threshold'] = self.tolerance_threshold
+            self.graph.nodes[pos]['satisfaction_ratio'] = 0  
 
     def get_neighbors(self, node):
         """Returns a list of all neighbors of node, ie all nodes that have an edge connected to it"""
         return list(self.graph.neighbors(node))
     
-    def is_unsatisfied(self, node):
-        """Checks if neighbors are at least node.treshold similar to node"""
+    def calculate_satisfaction(self, node):
+        """Checks if neighbors are at least node.threshold similar to node"""
 
         agent_id = self.graph.nodes[node]['class']
         if agent_id is None:
@@ -80,12 +77,13 @@ class Schelling:
             return False
 
         satisfaction_ratio = similar_count / occupied_count
+        self.graph.nodes[node]['satisfaction_ratio'] = satisfaction_ratio
 
         if DEBUG:
             print(f"Node at {node} (Class: {agent_id}) - Satisfaction ratio: {satisfaction_ratio}, Threshold: {self.graph.nodes[node]['threshold']}")
+            print(f"Node {node} is ////////////////////////////// Satisfied: {satisfaction_ratio > self.graph.nodes[node]['threshold']}")
 
-        # The agent is unsatisfied if the similarity ratio is below its threshold
-        return satisfaction_ratio < self.graph.nodes[node]['threshold']
+        return satisfaction_ratio 
     
     def move_agent(self, node):
         """Move agent to any free position/node in neighborhood"""
@@ -104,18 +102,20 @@ class Schelling:
     def simulate(self):
         """Move agents according to their satisfaction"""
 
-        all_nodes = list(self.graph.nodes)
-        self.random_seeded.shuffle(all_nodes) 
-        
-        unsatisfied_agents = [node for node in all_nodes if self.is_unsatisfied(node)]
+        all_nodes = [node for node in self.graph.nodes if self.graph.nodes[node]['class'] is not None]
+        self.random_seeded.shuffle(all_nodes)
 
-        if not unsatisfied_agents:
-            return False # All satisfied, stop simulation
+        unsatisfied = 0
+
+        for node in all_nodes:
+            self.calculate_satisfaction(node)
+
+            if self.graph.nodes[node]['satisfaction_ratio'] < self.graph.nodes[node]['threshold']:
+                self.move_agent(node)
+                unsatisfied += 1
         
-        for node in unsatisfied_agents:
-            self.move_agent(node)
-        return True
-       
+        return unsatisfied > 0
+
     def draw_graph(self, ax):
         """Assign a color to each node and draw the graph"""
 
@@ -170,17 +170,17 @@ class Schelling:
                 count[None] += 1
         return count
 
-schelling = Schelling(n_agent_classes=3, tolerance_treshold=0.5, lattice_m=50, lattice_n=50, empty_ratio=0.50, seed=0)
+schelling = Schelling(n_agent_classes=3, tolerance_threshold=0.5, lattice_m=50, lattice_n=50, empty_ratio=0.50, seed=0)
 fig, ax = plt.subplots(figsize=(8, 8))
 
 def update(frame):
     """Update function for each animation frame. Simulation ends when all nodes are satisfied."""
-
-    if not schelling.simulate(): # Simulate until all satisfied
-        ani.event_source.stop()  
-        print(f"Simulation ended at generation {frame + 1}.") 
     schelling.draw_graph(ax)  
     plt.title(f"Generation {frame + 1}")
+
+    if not schelling.simulate(): # stop when all agents satisfied
+        ani.event_source.stop()  
+        print(f"Simulation ended at generation {frame + 1}.") 
 
 schelling.print_node_counts()
 ani = animation.FuncAnimation(fig, update, frames=None, interval=1, repeat=False, save_count=0, cache_frame_data=False)
