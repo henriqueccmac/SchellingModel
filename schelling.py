@@ -24,6 +24,7 @@ class Schelling:
         self.random_seeded = np.random.default_rng(seed)
         self.assign_agents()
         self.node_count_per_class = self.count_nodes_per_class()
+        self.stuck_nodes = set()  # Nodes that are unable to move (no free positions)
 	
     def add_diagonal_edges(self, graph):
         """Add diagonal edges to existing grid graph"""
@@ -86,36 +87,39 @@ class Schelling:
         return satisfaction_ratio 
     
     def move_agent(self, node):
-        """Move agent to any free position/node in neighborhood"""
-
+        """Attempt to move an unsatisfied agent to an available position. If no positions are available, mark as stuck."""
         neighbor_positions = self.get_neighbors(node)
         available_positions = [n for n in neighbor_positions if self.graph.nodes[n]['class'] is None]
 
         if not available_positions:
-            return
+            self.stuck_nodes.add(node)  # Mark node as stuck
+            return False
 
+        # Move to new position
         new_position = tuple(self.random_seeded.choice(available_positions))
-
         self.graph.nodes[new_position]['class'] = self.graph.nodes[tuple(node)]['class']
         self.graph.nodes[tuple(node)]['class'] = None
+        return True 
 
     def simulate(self):
-        """Move agents according to their satisfaction"""
-
+        """Simulate a step in the model. If all unsatisfied nodes are stuck, the simulation ends."""
         all_nodes = [node for node in self.graph.nodes if self.graph.nodes[node]['class'] is not None]
         self.random_seeded.shuffle(all_nodes)
 
-        unsatisfied = 0
+        unsatisfied_nodes = 0
+        stuck_count = 0
 
         for node in all_nodes:
             self.calculate_satisfaction(node)
 
             if self.graph.nodes[node]['satisfaction_ratio'] < self.graph.nodes[node]['threshold']:
-                self.move_agent(node)
-                unsatisfied += 1
-        
-        return unsatisfied > 0
+                unsatisfied_nodes += 1
+                if not self.move_agent(node):
+                    stuck_count += 1
 
+        # End the simulation if all unsatisfied nodes are stuck
+        return not (stuck_count == unsatisfied_nodes and unsatisfied_nodes > 0) 
+    
     def draw_graph(self, ax):
         """Assign a color to each node and draw the graph"""
 
@@ -125,7 +129,12 @@ class Schelling:
         agent_color_map = {i + 1: colors[i % len(colors)] for i in range(self.n_agent_classes)}  # Mapping of agent ID to color
         agent_color_map[None] = '#FFFFFF'  # Empty nodes are white
 
-        node_color = [agent_color_map.get(self.graph.nodes[node].get('class'), '#FFFFFF') for node in self.graph.nodes()]
+        node_color = []
+        for node in self.graph.nodes():
+            if node in self.stuck_nodes:
+                node_color.append('#800080')  # Stuck nodes are purple
+            else:
+                node_color.append(agent_color_map.get(self.graph.nodes[node].get('class'), '#FFFFFF'))
 
         ax.clear()
 
@@ -144,8 +153,8 @@ class Schelling:
             node_size=adjusted_node_size,
             edge_color=None,
             ax=ax
-        )
-    
+        ) 
+
     def print_node_counts(self):
         """Print the total number of nodes for each class."""
 
