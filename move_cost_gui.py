@@ -1,18 +1,10 @@
-import networkx as nx
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-
-
-
 import tkinter as tk
 from tkinter import ttk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 import networkx as nx
 import numpy as np
-
-
 
 DEBUG = False 
 # ideas:
@@ -163,7 +155,7 @@ class Schelling:
         ax.spines['right'].set_visible(False)
         ax.spines['left'].set_visible(False)
         ax.spines['bottom'].set_visible(False)
-        
+
     def print_node_counts(self):
         """Print the total number of nodes for each class."""
 
@@ -188,12 +180,12 @@ class Schelling:
                 count[None] += 1
         return count
 
-# GUI Class for the Schelling Model
 class SchellingGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("Schelling Segregation Model")
+        self.root.title("Schelling Segregation Model - Move Cost")
         self.auto_simulating = False
+        self.simulation_speed = 400
 
         # Create a frame for the plot
         self.plot_frame = tk.Frame(self.root)
@@ -219,62 +211,11 @@ class SchellingGUI:
         # Create parameter input fields
         self.setup_widgets()
 
+        #Close program
+        self.root.protocol("WM_DELETE_WINDOW", self.close_program)
+
         # Initialize Schelling model with default values
         self.reset_simulation()
-
-        # Bind the resize event to update the layout dynamically
-        self.root.bind("<Configure>", self.on_resize)
-
-    def on_resize(self, event):
-        window_width = event.width
-        if window_width < 500:
-            self.arrange_controls(2)  # 2 columns in minimized version
-        else:
-            self.arrange_controls(4)  # 1 row in maximized version
-
-    def arrange_controls(self, columns):
-        for widget in self.control_frame.winfo_children():
-            widget.grid_forget()
-
-        if columns == 2:
-            self.lattice_rows_label.grid(row=0, column=0, padx=5, pady=5, sticky='w')
-            self.lattice_rows_entry.grid(row=0, column=1, padx=5, pady=5, sticky='w')
-
-            self.lattice_cols_label.grid(row=1, column=0, padx=5, pady=5, sticky='w')
-            self.lattice_cols_entry.grid(row=1, column=1, padx=5, pady=5, sticky='w')
-
-            self.tolerance_label.grid(row=2, column=0, padx=5, pady=5, sticky='w')
-            self.tolerance_entry.grid(row=2, column=1, padx=5, pady=5, sticky='w')
-
-            self.num_agents_label.grid(row=3, column=0, padx=5, pady=5, sticky='w')
-            self.num_agents_entry.grid(row=3, column=1, padx=5, pady=5, sticky='w')
-
-            self.empty_ratio_label.grid(row=4, column=0, padx=5, pady=5, sticky='w')
-            self.empty_ratio_entry.grid(row=4, column=1, padx=5, pady=5, sticky='w')
-
-            self.step_button.grid(row=5, column=0)
-            self.auto_button.grid(row=5, column=1)
-            self.reset_button.grid(row=5, column=2)
-
-        elif columns == 4:
-            self.lattice_rows_label.grid(row=0, column=0, padx=5, pady=5, sticky='w')
-            self.lattice_rows_entry.grid(row=0, column=1, padx=5, pady=5, sticky='w')
-            
-            self.lattice_cols_label.grid(row=0, column=2, padx=5, pady=5, sticky='w')
-            self.lattice_cols_entry.grid(row=0, column=3, padx=5, pady=5, sticky='w')
-
-            self.tolerance_label.grid(row=1, column=0, padx=5, pady=5, sticky='w')
-            self.tolerance_entry.grid(row=1, column=1, padx=5, pady=5, sticky='w')
-
-            self.num_agents_label.grid(row=1, column=2, padx=5, pady=5, sticky='w')
-            self.num_agents_entry.grid(row=1, column=3, padx=5, pady=5, sticky='w')
-
-            self.empty_ratio_label.grid(row=2, column=0, padx=5, pady=5, sticky='w')
-            self.empty_ratio_entry.grid(row=2, column=1, padx=5, pady=5, sticky='w')
-
-            self.step_button.grid(row=2, column=2)
-            self.auto_button.grid(row=2, column=3)
-            self.reset_button.grid(row=2, column=4)
 
     def setup_widgets(self):
         self.lattice_rows_label = tk.Label(self.control_frame, text="Lattice Rows:")
@@ -301,6 +242,38 @@ class SchellingGUI:
         self.auto_button = tk.Button(self.control_frame, text="Start Auto", command=self.toggle_auto_simulation)
         self.reset_button = tk.Button(self.control_frame, text="Reset", command=self.reset_simulation)
 
+
+            # Speed control
+        self.decrease_speed_button = tk.Button(self.control_frame, text="-", command=self.decrease_speed)
+        self.speed_label = tk.Label(self.control_frame, text=f"Speed: {self.simulation_speed} ms")
+        self.increase_speed_button = tk.Button(self.control_frame, text="+", command=self.increase_speed)
+
+        # Place speed control elements aligned to the left
+        self.decrease_speed_button.grid(row=3, column=0, padx=5, pady=5, sticky='w')
+        self.speed_label.grid(row=3, column=1, padx=5, pady=5, sticky='w')
+        self.increase_speed_button.grid(row=3, column=2, padx=5, pady=5, sticky='w')
+
+        
+        # Fixed layout for controls
+        self.lattice_rows_label.grid(row=0, column=0, padx=5, pady=5, sticky='w')
+        self.lattice_rows_entry.grid(row=0, column=1, padx=5, pady=5, sticky='w')
+        
+        self.lattice_cols_label.grid(row=0, column=2, padx=5, pady=5, sticky='w')
+        self.lattice_cols_entry.grid(row=0, column=3, padx=5, pady=5, sticky='w')
+
+        self.tolerance_label.grid(row=1, column=0, padx=5, pady=5, sticky='w')
+        self.tolerance_entry.grid(row=1, column=1, padx=5, pady=5, sticky='w')
+
+        self.num_agents_label.grid(row=1, column=2, padx=5, pady=5, sticky='w')
+        self.num_agents_entry.grid(row=1, column=3, padx=5, pady=5, sticky='w')
+
+        self.empty_ratio_label.grid(row=2, column=0, padx=5, pady=5, sticky='w')
+        self.empty_ratio_entry.grid(row=2, column=1, padx=5, pady=5, sticky='w')
+
+        self.step_button.grid(row=2, column=2)
+        self.auto_button.grid(row=2, column=3)
+        self.reset_button.grid(row=2, column=4)
+
     def toggle_auto_simulation(self):
         self.auto_simulating = not self.auto_simulating
         if self.auto_simulating:
@@ -311,18 +284,41 @@ class SchellingGUI:
 
     def run_auto_simulation(self):
         if self.auto_simulating:
-            self.step_simulation()
-            self.root.after(500, self.run_auto_simulation)
+            moved = self.model.simulate()  # Simulate and check if anything moved
+            if moved:
+                self.generation += 1  # Increment generation
+                self.update_plot()
+                self.root.after(self.simulation_speed, self.run_auto_simulation)  # Continue auto-simulation
+            else:
+                self.auto_simulating = False
+                self.auto_button.config(text="Start Auto")  # Stop if no movement
+
+    def increase_speed(self):
+        if self.simulation_speed > 50:  
+            self.simulation_speed -= 50
+        self.update_speed_label()
+
+    def decrease_speed(self):
+        self.simulation_speed += 50  # Increase delay (decrease speed)
+        self.update_speed_label()
+
+    def update_speed_label(self):
+        self.speed_label.config(text=f"Speed: {self.simulation_speed} ms")
 
     def step_simulation(self):
-        self.model.simulate()
-        self.generation += 1  # Increment generation
-        self.update_plot()
+        moved = self.model.simulate()  # Get whether agents moved
+        if moved:
+            self.generation += 1  # Increment generation only if agents moved
+            self.update_plot()
+        else:
+            self.auto_simulating = False
+            self.auto_button.config(text="Start Auto")  # Stop auto-simulation if no agents moved
+
 
     def reset_simulation(self):
         # Stop auto-simulation if it is running
         self.auto_simulating = False
-        self.auto_button.config(text="Start Auto")  # Reset the auto button label
+        self.auto_button.config(text="Start Auto")  # Reset the auto button label
         lattice_rows = int(self.lattice_rows_entry.get())
         lattice_cols = int(self.lattice_cols_entry.get())
         tolerance = float(self.tolerance_entry.get())
@@ -336,16 +332,29 @@ class SchellingGUI:
             lattice_n=lattice_cols,
             empty_ratio=empty_ratio
         )
-        self.generation = 1  # Reset generation to 1
+        self.generation = 1  # Reset generation to 1
         self.update_plot()
 
     def update_plot(self):
         self.model.draw_graph(self.ax)
         self.ax.set_title(f"Generation: {self.generation}")
         self.canvas.draw()
+
+    def close_program(self):
+        # Stop auto-simulation if it's running
+        self.auto_simulating = False
         
+        # Perform any necessary cleanup here if needed
+        print("Closing the application...")
+
+        # Exit the Tkinter main loop and close the program
+        self.root.quit()
+        self.root.destroy()
+
 
 if __name__ == "__main__":
     root = tk.Tk()
     app = SchellingGUI(root)
     root.mainloop()
+
+
