@@ -176,7 +176,7 @@ class Schelling:
 class SchellingGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("Schelling Segregation Model")
+        self.root.title("Schelling Segregation Model - Random Move")
         self.auto_simulating = False
         self.simulation_speed = 400
 
@@ -349,5 +349,3 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = SchellingGUI(root)
     root.mainloop()
-
-
