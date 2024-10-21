@@ -3,13 +3,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
-DEBUG = True 
+DEBUG = False 
 
 class Schelling:
-    def __init__(self, n_agent_classes, tolerance_threshold, lattice_m, lattice_n, empty_ratio, seed=0):
+    def __init__(self, n_agent_classes, tolerance_threshold, lattice_m, lattice_n, empty_ratio, seed=0, tolerance_step=0.05):
         self.seed = seed
         self.empty_ratio = empty_ratio
         self.tolerance_threshold = tolerance_threshold
+        self.tolerance_step = tolerance_step
         self.n_agent_classes = n_agent_classes
         
         self.lattice_m = lattice_m
@@ -24,7 +25,6 @@ class Schelling:
         self.random_seeded = np.random.default_rng(seed)
         self.assign_agents()
         self.node_count_per_class = self.count_nodes_per_class()
-        self.stuck_nodes = set()  # Nodes that are unable to move (no free positions)
 	
     def add_diagonal_edges(self, graph):
         """Add diagonal edges to existing grid graph"""
@@ -57,7 +57,7 @@ class Schelling:
         for pos, agent_id in zip(positions, agent_id_list):
             self.graph.nodes[pos]['class'] = None if agent_id == 0 else agent_id
             self.graph.nodes[pos]['threshold'] = self.tolerance_threshold
-            self.graph.nodes[pos]['satisfaction_ratio'] = 0  
+            self.graph.nodes[pos]['satisfaction_ratio'] = 0 
 
     def get_neighbors(self, node):
         """Returns a list of all neighbors of node, ie all nodes that have an edge connected to it"""
@@ -80,45 +80,62 @@ class Schelling:
         satisfaction_ratio = similar_count / occupied_count
         self.graph.nodes[node]['satisfaction_ratio'] = satisfaction_ratio
 
-        if DEBUG:
-            print(f"Node at {node} (Class: {agent_id}) - Satisfaction ratio: {satisfaction_ratio}, Threshold: {self.graph.nodes[node]['threshold']}")
-            print(f"Node {node} is ////////////////////////////// Satisfied: {satisfaction_ratio > self.graph.nodes[node]['threshold']}")
+        return satisfaction_ratio
 
-        return satisfaction_ratio 
-    
     def move_agent(self, node):
-        """Attempt to move an unsatisfied agent to an available position. If no positions are available, mark as stuck."""
+        """Move agent to any free position/node in neighborhood"""
+
         neighbor_positions = self.get_neighbors(node)
         available_positions = [n for n in neighbor_positions if self.graph.nodes[n]['class'] is None]
 
         if not available_positions:
-            self.stuck_nodes.add(node)  # Mark node as stuck
-            return False
+            return
 
-        # Move to new position
         new_position = tuple(self.random_seeded.choice(available_positions))
+
         self.graph.nodes[new_position]['class'] = self.graph.nodes[tuple(node)]['class']
         self.graph.nodes[tuple(node)]['class'] = None
-        return True 
 
     def simulate(self):
-        """Simulate a step in the model. If all unsatisfied nodes are stuck, the simulation ends."""
+        """Move agents according to their satisfaction"""
+
         all_nodes = [node for node in self.graph.nodes if self.graph.nodes[node]['class'] is not None]
         self.random_seeded.shuffle(all_nodes)
-
-        unsatisfied_nodes = 0
-        stuck_count = 0
 
         for node in all_nodes:
             self.calculate_satisfaction(node)
 
             if self.graph.nodes[node]['satisfaction_ratio'] < self.graph.nodes[node]['threshold']:
-                unsatisfied_nodes += 1
-                if not self.move_agent(node):
-                    stuck_count += 1
+                self.adapt_tolerance(node, increase=False)
+                self.move_agent(node)
+            else:
+                self.adapt_tolerance(node, increase=True)
 
-        # End the simulation if all unsatisfied nodes are stuck
-        return not (stuck_count == unsatisfied_nodes and unsatisfied_nodes > 0) 
+
+    def adapt_tolerance(self, node, increase=True):
+        """Adapt tolerance based on satisfaction ratio using previously calculated occupied neighbors"""
+
+        satisfaction_ratio = self.graph.nodes[node]['satisfaction_ratio']
+        neighborhood = self.get_neighbors(node)
+        total_occupied_neighbors = sum(1 for n in neighborhood if self.graph.nodes[n]['class'] is not None)
+
+        if total_occupied_neighbors == 0:
+            return
+
+        dissimilar_neighbors = total_occupied_neighbors * (1 - satisfaction_ratio)
+
+        if increase:
+            if DEBUG:
+                print(f"Node {node}     | Satisfaction {self.graph.nodes[node]['satisfaction_ratio']} with increase +{self.tolerance_step * dissimilar_neighbors} |     Tolerance threshold is {self.graph.nodes[node]['threshold']}")
+            self.graph.nodes[node]['threshold'] += self.tolerance_step * dissimilar_neighbors
+        else:
+            if DEBUG:
+                print(f"Node {node}     | Satisfaction {self.graph.nodes[node]['satisfaction_ratio']} with decrease -{self.tolerance_step * dissimilar_neighbors} |     Tolerance threshold is {self.graph.nodes[node]['threshold']}")
+            self.graph.nodes[node]['threshold'] -= self.tolerance_step * dissimilar_neighbors
+
+        self.graph.nodes[node]['threshold'] = max(0.2, min(0.98, self.graph.nodes[node]['threshold']))
+        if DEBUG:
+            print(f"New Tolerance Threshold for node {node} is {self.graph.nodes[node]['threshold']}")
     
     def draw_graph(self, ax):
         """Assign a color to each node and draw the graph"""
@@ -129,12 +146,7 @@ class Schelling:
         agent_color_map = {i + 1: colors[i % len(colors)] for i in range(self.n_agent_classes)}  # Mapping of agent ID to color
         agent_color_map[None] = '#FFFFFF'  # Empty nodes are white
 
-        node_color = []
-        for node in self.graph.nodes():
-            if node in self.stuck_nodes:
-                node_color.append('#800080')  # Stuck nodes are purple
-            else:
-                node_color.append(agent_color_map.get(self.graph.nodes[node].get('class'), '#FFFFFF'))
+        node_color = [agent_color_map.get(self.graph.nodes[node].get('class'), '#FFFFFF') for node in self.graph.nodes()]
 
         ax.clear()
 
@@ -153,8 +165,8 @@ class Schelling:
             node_size=adjusted_node_size,
             edge_color=None,
             ax=ax
-        ) 
-
+        )
+    
     def print_node_counts(self):
         """Print the total number of nodes for each class."""
 
@@ -179,18 +191,16 @@ class Schelling:
                 count[None] += 1
         return count
 
-schelling = Schelling(n_agent_classes=3, tolerance_threshold=0.5, lattice_m=50, lattice_n=50, empty_ratio=0.50, seed=0)
+schelling = Schelling(n_agent_classes=2, tolerance_threshold=0.7, lattice_m=50, lattice_n=50, empty_ratio=0.50, seed=0)
 fig, ax = plt.subplots(figsize=(8, 8))
 
 def update(frame):
     """Update function for each animation frame. Simulation ends when all nodes are satisfied."""
-    schelling.draw_graph(ax)  
+    schelling.simulate()
+    schelling.draw_graph(ax) 
     plt.title(f"Generation {frame + 1}")
 
-    if not schelling.simulate(): # stop when all agents satisfied
-        ani.event_source.stop()  
-        print(f"Simulation ended at generation {frame + 1}.") 
-
 schelling.print_node_counts()
-ani = animation.FuncAnimation(fig, update, frames=None, interval=1, repeat=False, save_count=0, cache_frame_data=False)
+ani = animation.FuncAnimation(fig, update, frames=5000, interval=1, repeat=False, cache_frame_data=False)
 plt.show()
+

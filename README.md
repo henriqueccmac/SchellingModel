@@ -33,10 +33,21 @@ pip install networkx matplotlib numpy
 
 ## Running the simulation
 
-The main code is contained in the **schelling.py** file. To run the simulation, execute the following command:
+The code for the Schelling model is contained in the **schelling_model.py** file. To run the simulation, execute the following command:
 
 ```bash
-    python schelling.py
+    python schelling_model.py
+```
+
+To run the adaptive tolerance model, contained in **adaptive_tolerance_model.py**, execute the command:
+
+```bash
+    python adaptive_tolerance_model.py
+```
+
+If you prefer a gui interface to change the simulation parameters, you can execute the command:
+```bash
+    python schelling_model_gui.py
 ```
 
 ### Parameters
@@ -75,9 +86,4 @@ By default, the simulation runs on a `50x50` grid with two agent classes, a `0.5
 After running the simulation, the model provides visual and statistical outputs:
 
 - **Grid Visualization:** Displays the state of the grid with different colors representing different agent classes, empty spaces, and stuck agents.
-
-- **Homogeneity & Moran's I:** Two statistical measures of segregation:
-  - **Homogeneity:** Measures the proportion of agents surrounded by similar agents.
-  - **Moran's I:** Quantifies spatial autocorrelation (clustering) of similar agents.
-
-Plots for **Homogeneity** and **Moran's I** are generated after each simulation run, illustrating how these metrics evolve with varying tolerance thresholds and empty ratios.
+To run the model and calculate Moran's I and Homogeneity metrics, follow the instructions in the jupyter notebook in the git repository.
