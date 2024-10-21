@@ -6,13 +6,14 @@ import matplotlib.animation as animation
 import networkx as nx
 import numpy as np
 
-DEBUG = False 
+DEBUG = True
 
 class Schelling:
-    def __init__(self, n_agent_classes, tolerance_treshold, lattice_m, lattice_n, empty_ratio, seed=0):
+    def __init__(self, n_agent_classes, tolerance_threshold, lattice_m, lattice_n, empty_ratio, seed=0, tolerance_step=0.05):
         self.seed = seed
         self.empty_ratio = empty_ratio
-        self.tolerance_treshold = tolerance_treshold
+        self.tolerance_threshold = tolerance_threshold
+        self.tolerance_step = tolerance_step
         self.n_agent_classes = n_agent_classes
         
         self.lattice_m = lattice_m
@@ -58,14 +59,15 @@ class Schelling:
 
         for pos, agent_id in zip(positions, agent_id_list):
             self.graph.nodes[pos]['class'] = None if agent_id == 0 else agent_id
-            self.graph.nodes[pos]['threshold'] = self.tolerance_treshold
+            self.graph.nodes[pos]['threshold'] = self.tolerance_threshold
+            self.graph.nodes[pos]['satisfaction_ratio'] = 0 
 
     def get_neighbors(self, node):
         """Returns a list of all neighbors of node, ie all nodes that have an edge connected to it"""
         return list(self.graph.neighbors(node))
     
-    def is_unsatisfied(self, node):
-        """Checks if neighbors are at least node.treshold similar to node"""
+    def calculate_satisfaction(self, node):
+        """Checks if neighbors are at least node.threshold similar to node"""
 
         agent_id = self.graph.nodes[node]['class']
         if agent_id is None:
@@ -79,13 +81,10 @@ class Schelling:
             return False
 
         satisfaction_ratio = similar_count / occupied_count
+        self.graph.nodes[node]['satisfaction_ratio'] = satisfaction_ratio
 
-        if DEBUG:
-            print(f"Node at {node} (Class: {agent_id}) - Satisfaction ratio: {satisfaction_ratio}, Threshold: {self.graph.nodes[node]['threshold']}")
+        return satisfaction_ratio
 
-        # The agent is unsatisfied if the similarity ratio is below its threshold
-        return satisfaction_ratio < self.graph.nodes[node]['threshold']
-    
     def move_agent(self, node):
         """Move agent to any free position/node in neighborhood"""
 
@@ -102,18 +101,49 @@ class Schelling:
 
     def simulate(self):
         """Move agents according to their satisfaction"""
+        all_nodes = [node for node in self.graph.nodes if self.graph.nodes[node]['class'] is not None]
+        self.random_seeded.shuffle(all_nodes)
 
-        all_nodes = list(self.graph.nodes)
-        self.random_seeded.shuffle(all_nodes) 
-        
-        unsatisfied_agents = [node for node in all_nodes if self.is_unsatisfied(node)]
+        moved = False  # Track if any agent moved
 
-        if not unsatisfied_agents:
-            return False # All satisfied, stop simulation
-        
-        for node in unsatisfied_agents:
-            self.move_agent(node)
-        return True
+        for node in all_nodes:
+            self.calculate_satisfaction(node)
+
+            if self.graph.nodes[node]['satisfaction_ratio'] < self.graph.nodes[node]['threshold']:
+                self.adapt_tolerance(node, increase=False)
+                self.move_agent(node)
+                moved = True  # Mark that at least one agent moved
+            else:
+                self.adapt_tolerance(node, increase=True)
+
+        return moved  # Return whether any agent moved
+
+
+
+    def adapt_tolerance(self, node, increase=True):
+        """Adapt tolerance based on satisfaction ratio using previously calculated occupied neighbors"""
+
+        satisfaction_ratio = self.graph.nodes[node]['satisfaction_ratio']
+        neighborhood = self.get_neighbors(node)
+        total_occupied_neighbors = sum(1 for n in neighborhood if self.graph.nodes[n]['class'] is not None)
+
+        if total_occupied_neighbors == 0:
+            return
+
+        dissimilar_neighbors = total_occupied_neighbors * (1 - satisfaction_ratio)
+
+        if increase:
+            if DEBUG:
+                print(f"Node {node}     | Satisfaction {self.graph.nodes[node]['satisfaction_ratio']} with increase +{self.tolerance_step * dissimilar_neighbors} |     Tolerance threshold is {self.graph.nodes[node]['threshold']}")
+            self.graph.nodes[node]['threshold'] += self.tolerance_step * dissimilar_neighbors
+        else:
+            if DEBUG:
+                print(f"Node {node}     | Satisfaction {self.graph.nodes[node]['satisfaction_ratio']} with decrease -{self.tolerance_step * dissimilar_neighbors} |     Tolerance threshold is {self.graph.nodes[node]['threshold']}")
+            self.graph.nodes[node]['threshold'] -= self.tolerance_step * dissimilar_neighbors
+
+        self.graph.nodes[node]['threshold'] = max(0.2, min(0.98, self.graph.nodes[node]['threshold']))
+        if DEBUG:
+            print(f"New Tolerance Threshold for node {node} is {self.graph.nodes[node]['threshold']}")
     
     def draw_graph(self, ax):
         """Draw the grid using uniformly sized squares that touch each other."""
@@ -146,8 +176,8 @@ class Schelling:
         ax.spines['left'].set_visible(False)
         ax.spines['bottom'].set_visible(False)
 
-
-
+       
+    
     def print_node_counts(self):
         """Print the total number of nodes for each class."""
 
@@ -171,13 +201,13 @@ class Schelling:
             else:
                 count[None] += 1
         return count
-# GUI Class for the Schelling Model
+
 class SchellingGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("Schelling Segregation Model")
+        self.root.title("Schelling Segregation Model - Adaptive Tolerance")
         self.auto_simulating = False
-        self.simulation_speed = 400
+        self.simulation_speed = 1
 
         # Create a frame for the plot
         self.plot_frame = tk.Frame(self.root)
@@ -285,6 +315,7 @@ class SchellingGUI:
                 self.auto_simulating = False
                 self.auto_button.config(text="Start Auto")  # Stop if no movement
 
+
     def increase_speed(self):
         if self.simulation_speed > 50:  
             self.simulation_speed -= 50
@@ -319,7 +350,7 @@ class SchellingGUI:
 
         self.model = Schelling(
             n_agent_classes=num_agents,
-            tolerance_treshold=tolerance,
+            tolerance_threshold=tolerance,
             lattice_m=lattice_rows,
             lattice_n=lattice_cols,
             empty_ratio=empty_ratio
@@ -348,5 +379,3 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = SchellingGUI(root)
     root.mainloop()
-
-
