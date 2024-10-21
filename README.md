@@ -50,6 +50,12 @@ If you prefer a gui interface to change the simulation parameters, you can execu
     python schelling_model_gui.py
 ```
 
+To calculate the metrics shown in the report, execute the corresponding file in the metrics folder. For example, to run the tolerance threshold metrics calculations for the adaptive tolerance model:
+```bash
+    python metrics/tolerance_threshold_schelling_model.py
+```
+The metrics calculations run in the background, without showing a visual representation.
+
 ### Parameters
 
 - **Grid Size:** The size of the 2D grid (e.g., 50x50).
@@ -83,7 +89,6 @@ By default, the simulation runs on a `50x50` grid with two agent classes, a `0.5
 
 ### Outputs
 
-After running the simulation, the model provides visual and statistical outputs:
+After running the simulation, the model provides visual a output:
 
 - **Grid Visualization:** Displays the state of the grid with different colors representing different agent classes, empty spaces, and stuck agents.
-To run the model and calculate Moran's I and Homogeneity metrics, follow the instructions in the jupyter notebook in the git repository.
